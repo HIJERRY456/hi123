@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双人五子棋 · 点对点对战</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
+        body { 
+            background: linear-gradient(145deg, #2b5a4c 0%, #1d7a5e 100%); 
+            min-height: 100vh; margin: 0; display: flex; justify-content: center; align-items: center; padding: 16px; 
+        }
+        .game-container { 
+            max-width: 650px; width: 100%; background: #ecf0e7; border-radius: 48px; 
+            box-shadow: 0 25px 40px rgba(0,20,10,0.5); padding: 28px 24px; border: 2px solid #b89b7b; 
+        }
+        h1 { margin: 0 0 8px 0; font-weight: 500; font-size: 2.2rem; color: #362812; display: flex; align-items: center; gap: 10px; letter-spacing: 2px; }
+        h1 span { background: #3a2c1b; color: #efdab9; font-size: 0.9rem; padding: 4px 14px; border-radius: 40px; font-weight: 400; }
+        .peer-panel { background: #d8cfb0; border-radius: 36px; padding: 20px; margin: 10px 0 18px; border: 2px solid #b4925a; }
+        .id-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .label { font-weight: 600; color: #3f301d; }
+        .my-id { background: #fef7e6; padding: 6px 16px; border-radius: 40px; font-family: 'Courier New', monospace; font-weight: 600; border: 1px solid #ac8e62; color: #2f4d3a; word-break: break-all; }
+        .connect-area { display: flex; flex-direction: column; gap: 14px; }
+        .input-group { display: flex; gap: 10px; }
+        .input-group input { flex: 1; padding: 12px 20px; border: 2px solid #b4925a; border-radius: 40px; font-size: 1rem; background: #fffbf0; outline: none; }
+        .input-group input:focus { border-color: #3f6b5c; box-shadow: 0 0 0 3px rgba(63,107,92,0.3); }
+        button { background: #3f6b5c; border: none; color: white; font-weight: 600; padding: 12px 28px; border-radius: 40px; font-size: 1.1rem; cursor: pointer; border-bottom: 4px solid #1e4036; transition: 0.1s; }
+        button:hover { background: #4f7f6e; transform: translateY(-2px); border-bottom-width: 5px; }
+        button:active { transform: translateY(2px); border-bottom-width: 2px; }
+        button:disabled { opacity: 0.5; pointer-events: none; background: #789b8e; border-bottom-color: #4f6b61; }
+        .status-badge { background: #f3e9d2; padding: 8px 20px; border-radius: 40px; font-size: 1rem; font-weight: 600; color: #3a4e3d; border: 2px solid #b4925a; display: inline-block; }
+        .game-area { margin-top: 25px; background: #e2d7bb; border-radius: 48px; padding: 20px; border: 3px solid #b89b7b; }
+        .board-container { display: flex; justify-content: center; }
+        canvas { background: #e8d6b0; border-radius: 32px; box-shadow: inset 0 0 0 2px #b4925a, 0 12px 18px rgba(0,0,0,0.3); width: 100%; height: auto; cursor: pointer; }
+        .info-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; background: #cdbb96; border-radius: 60px; padding: 12px 22px; border: 2px solid #9f824b; }
+        .turn-indicator { font-size: 1.3rem; font-weight: 600; color: #1a2f27; }
+        #restartBtn { background: #5e4a33; border-bottom-color: #3d2f1f; padding: 8px 24px; font-size: 1rem; }
+        .footer { margin-top: 20px; color: #e9dbbc; text-align: center; font-size: 0.9rem; text-shadow: 1px 1px 0 #1d3b30; }
+        .footer a { color: #ffefc0; }
+        .hidden { display: none; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div class="game-container">
+    <h1>⚫ 五子棋 ⚪ <span>P2P 直连</span></h1>
+    <div class="peer-panel">
+        <div class="id-row">
+            <span class="label">🆔 你的房间ID</span>
+            <span class="my-id" id="my-id-display">生成中…</span>
+        </div>
+        <div class="connect-area">
+            <div class="input-group">
+                <input type="text" id="remote-peer-id" placeholder="输入对手ID" autocomplete="off">
+                <button id="connect-button">🔗 连接对手</button>
+            </div>
+            <div class="status-badge" id="connection-status">⚪ 未连接</div>
+        </div>
+    </div>
+    <div id="game-area" class="game-area hidden">
+        <div class="board-container">
+            <canvas id="gobanCanvas" width="540" height="540"></canvas>
+        </div>
+        <div class="info-bar">
+            <div class="turn-indicator" id="turnDisplay">⚫ 黑棋走</div>
+            <button id="restartBtn">🔄 重新开始</button>
+        </div>
+        <div id="winnerMessage" style="text-align:center; margin-top:10px; font-weight:bold; font-size:1.2rem; color:#5c3317;"></div>
+    </div>
+    <div class="footer">
+        ✦ 谁先连接谁执黑？不——完全由落子顺序决定：棋盘空时黑先，轮流下 ✦<br>
+        一方获胜后自动禁用落子，可点「重新开始」再次对局
+    </div>
+</div>
+
+<script>
+// All JS for the game + PeerJS connection
+(function() {
+    const BOARD_SIZE = 15;
+    const CELL_SIZE = 540 / BOARD_SIZE;
+    const EMPTY = 0, BLACK = 1, WHITE = 2;
+    let board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(EMPTY)); 
+    let currentPlayer = BLACK, gameOver = false, winner = null, myColor = null, opponentColor = null;
+    let peer = null, conn = null, isConnected = false;
+    const myIdSpan = document.getElementById('my-id-display');
+    const remoteInput = document.getElementById('remote-peer-id');
+    const connectBtn = document.getElementById('connect-button');
+    const statusDiv = document.getElementById('connection-status');
+    const gameArea = document.getElementById('game-area');
+    const canvas = document.getElementById('gobanCanvas');
+    const ctx = canvas.getContext('2d');
+    const turnDisplay = document.getElementById('turnDisplay');
+    const winnerMsg = document.getElementById('winnerMessage');
+    const restartBtn = document.getElementById('restartBtn');
+
+    function drawBoard() {
+        ctx.clearRect(0, 0, 540, 540);
+        ctx.lineWidth = 1.5; ctx.strokeStyle = '#7a5a3a';
+        for (let i = 0; i < BOARD_SIZE; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * CELL_SIZE + CELL_SIZE/2, CELL_SIZE/2);
+            ctx.lineTo(i * CELL_SIZE + CELL_SIZE/2, 540 - CELL_SIZE/2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(CELL_SIZE/2, i * CELL_SIZE + CELL_SIZE/2);
+            ctx.lineTo(540 - CELL_SIZE/2, i * CELL_SIZE + CELL_SIZE/2);
+            ctx.stroke();
+        }
+        const starPoints = [3,7,11];
+        ctx.fillStyle = '#7a5a3a';
+        for (let r of starPoints) for (let c of starPoints) { ctx.beginPath(); ctx.arc(c*CELL_SIZE+CELL_SIZE/2, r*CELL_SIZE+CELL_SIZE/2, 5,0,2*Math.PI); ctx.fill(); }
+        for (let row=0; row<BOARD_SIZE; row++) for (let col=0; col<BOARD_SIZE; col++) {
+            if (board[row][col]===EMPTY) continue;
+            const x=col*CELL_SIZE+CELL_SIZE/2, y=row*CELL_SIZE+CELL_SIZE/2;
+            const gradient = ctx.createRadialGradient(x-4,y-4,5,x,y,CELL_SIZE/1.8);
+            if(board[row][col]===BLACK){gradient.addColorStop(0,'#2b2b2b'); gradient.addColorStop(0.7,'#111'); gradient.addColorStop(1,'#3f3f3f');} 
+            else {gradient.addColorStop(0,'#f9f9fa'); gradient.addColorStop(0.5,'#ddd4c0'); gradient.addColorStop(1,'#b1a58b');}
+            ctx.beginPath(); ctx.arc(x,y,CELL_SIZE/2-3,0,2*Math.PI); ctx.fillStyle=gradient; ctx.fill(); ctx.strokeStyle='#333'; ctx.lineWidth=1; ctx.stroke();
+        }
+    }
+
+    function updateUI() {
+        drawBoard();
+        if(gameOver){turnDisplay.innerHTML=winner===BLACK?'🏆 黑方胜！':winner===WHITE?'🏆 白方胜！':'⚖️ 对局结束';} 
+        else {turnDisplay.innerHTML=currentPlayer===BLACK?'⚫ 黑棋走':'⚪ 白棋走';}
+        winnerMsg.innerText=winner?winner===BLACK?'黑棋获胜！':winner===WHITE?'白棋获胜！':'' : '';
+    }
+
+    function checkWinner(row,col,color){
+        const dirs=[[1,0],[0,1],[1,1],[1,-1]];
+        for(let [dx,dy] of dirs){
+            let count=1;
+            for(let step=1;step<5;step++){const nr=row+dx*step,nc=col+dy*step;if(nr<0||nr>=BOARD_SIZE||nc<0||nc>=BOARD_SIZE||board[nr][nc]!==color) break; count++;}
+            for(let step=1;step<5;step++){const nr=row-dx*step,nc=col-dy*step;if(nr<0||nr>=BOARD_SIZE||nc<0||nc>=BOARD_SIZE||board[nr][nc]!==color) break; count++;}
+            if(count>=5) return color;
+        }
+        return null;
+    }
+
+    function resetGame(){board=Array(BOARD_SIZE).fill().map(()=>Array(BOARD_SIZE).fill(EMPTY)); currentPlayer=BLACK; gameOver=false; winner=null; updateUI();}
+
+    function handleOpponentMove(data){
+        if(gameOver) return;
+        const {row,col}=data;
+        if(!data.hasOwnProperty('color')) return;
+        const color=data.color;
+        if(board[row][col]!==EMPTY) return;
+        board[row][col]=color;
+        const winColor=checkWinner(row,col,color);
+        if(winColor){gameOver=true; winner=winColor;} else {currentPlayer=color===BLACK?WHITE:BLACK;}
+        updateUI();
+    }
+
+    function setupConnection(connection,isInitiator=false){
+        if(conn){try{conn.close();}catch(e){} conn=null;}
+        conn=connection;
+        conn.on('open',()=>{
+            isConnected=true; statusDiv.innerHTML='🟢 已连接'; gameArea.classList.remove('hidden'); connectBtn.disabled=true; remoteInput.disabled=true;
+            if(isInitiator){myColor=BLACK; opponentColor=WHITE;} else {myColor=WHITE; opponentColor=BLACK;}
+            resetGame();
+        });
+        conn.on('data',(data)=>{if(data.type==='move'){handleOpponentMove(data);} else if(data.type==='reset'){resetGame();}});
+        conn.on('error',()=>{statusDiv.innerHTML='🔴 连接断开'; gameArea.classList.add('hidden'); isConnected=false; connectBtn.disabled=false; remoteInput.disabled=false; myColor=null;});
+        conn.on('close',()=>{statusDiv.innerHTML='⚪ 连接关闭'; gameArea.classList.add('hidden'); isConnected=false; connectBtn.disabled=false; remoteInput.disabled=false; myColor=null;});
+    }
+
+    function initPeer(){
+        peer=new Peer();
+        peer.on('open',(id)=>{myIdSpan.textContent=id;});
+        peer.on('connection',(incomingConn)=>{if(conn && isConnected){incomingConn.close(); return;} setupConnection(incomingConn,false);});
+        peer.on('error',(err)=>{if(err.type==='unavailable-id'){myIdSpan.textContent='ID生成失败';}});
+    }
+
+    function connectToPeer(){
+        const remoteId=remoteInput.value.trim();
+        if(!remoteId) return alert('请输入对手ID');
+        if(!peer) return alert('Peer未就绪');
+        if(conn && isConnected) conn.close();
+        try{
+            const newConn=peer.connect(remoteId,{reliable:true});
+            if(newConn){setupConnection(newConn,true); statusDiv.innerHTML='🟡 连接中...';} else throw new Error('连接创建失败');
+        }catch(err){statusDiv.innerHTML='🔴 连接失败';}
+    }
+
+    canvas.addEventListener('click',(e)=>{
+        if(!isConnected || !myColor || gameOver) return;
+        const rect=canvas.getBoundingClientRect();
+        const scaleX=canvas.width/rect.width, scaleY=canvas.height/rect.height;
+        const mouseX=(e.clientX-rect.left)*scaleX, mouseY=(e.clientY-rect.top)*scaleY;
+        const col=Math.floor(mouseX/CELL_SIZE), row=Math.floor(mouseY/CELL_SIZE);
+        if(row>=0 && row<BOARD_SIZE && col>=0 && col<BOARD_SIZE){
+            if(board[row][col]===EMPTY && !gameOver && myColor===currentPlayer){
+                board[row][col]=myColor;
+                const winColor=checkWinner(row,col,myColor);
+                if(winColor){gameOver=true; winner=winColor;} else {currentPlayer=currentPlayer===BLACK?WHITE:BLACK;}
+                updateUI();
+                if(conn && isConnected){conn.send({type:'move', row:row, col:col, color:myColor});}
+            }else{if(myColor!==currentPlayer) alert('现在不是你的回合'); else if(gameOver) alert('游戏已结束'); else alert('此处已有棋子');}
+        }
+    });
+
+    restartBtn.addEventListener('click',()=>{if(!isConnected) return; resetGame(); if(conn && isConnected){conn.send({type:'reset'});}});
+    connectBtn.addEventListener('click',connectToPeer);
+    remoteInput.addEventListener('keypress',(e)=>{if(e.key==='Enter') connectBtn.click();});
+    initPeer();
+    drawBoard();
+})();
+</script>
+</body>
+</html>
